@@ -1,14 +1,10 @@
-// src/components/Sidebar.jsx
-
 import {
   Plus,
-  MessageCircle,
   Settings,
   Menu, // For the desktop toggle
   X, // For the mobile close button
 } from "lucide-react";
 
-// (Your chatHistory array remains the same)
 const chatHistory = [
   { id: 1, title: "Bayes' Theorem explanation" },
   { id: 2, title: "P-value interpretation" },
@@ -145,11 +141,6 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
         >
           <Settings className="h-5 w-5 shrink-0" />
           <span
-            // ---------------------------------------------------------------
-            // FIX 2 (Continued):
-            // 1. Added `truncate`
-            // 2. Removed `md:hidden`
-            // ---------------------------------------------------------------
             className={`text-sm truncate transition-opacity ${
               isSidebarOpen ? "opacity-100" : "opacity-0"
             }`}
