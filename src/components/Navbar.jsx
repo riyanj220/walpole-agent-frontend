@@ -3,6 +3,7 @@
 import { BsChatQuote } from "react-icons/bs";
 import { PiUserCircle } from "react-icons/pi";
 import { Menu } from "lucide-react"; // 1. Import the Menu icon
+import { Link } from "react-router-dom";
 
 // 2. Accept `toggleSidebar` as a prop
 const Navbar = ({ toggleSidebar }) => {
@@ -29,21 +30,21 @@ const Navbar = ({ toggleSidebar }) => {
 
         {/* 6. Right Side: Nav Links and User Icon */}
         <div className="flex items-center gap-3 md:gap-6">
-          <a
-            href="#"
+          <Link
+            href="/"
             className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700"
           >
             Chat
-          </a>
-          <a
+          </Link>
+          {/* <a
             href="#"
             className="hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:block"
           >
             About
-          </a>
-          <a href="#" className="text-slate-500">
+          </a> */}
+          <Link to="/auth" className="text-slate-500">
             <PiUserCircle className="text-3xl hover:text-slate-700" />
-          </a>
+          </Link>
         </div>
       </div>
     </nav>
