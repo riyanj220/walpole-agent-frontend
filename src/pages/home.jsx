@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { SendHorizontal, User, Bot } from "lucide-react";
+import axiosClient from "../api/axiosClient";
 
 const Header = () => (
   <header className="text-center mb-10">
@@ -87,7 +88,7 @@ const ChatMessage = ({ message }) => {
       className={`flex gap-4 p-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <div className="flex-shrink-0 bg-green-100 p-2 rounded-full h-10 w-10 flex items-center justify-center">
+        <div className="shrink-0 bg-green-100 p-2 rounded-full h-10 w-10 flex items-center justify-center">
           <Bot className="w-6 h-6 text-green-600" />
         </div>
       )}
@@ -101,7 +102,7 @@ const ChatMessage = ({ message }) => {
         {content}
       </div>
       {isUser && (
-        <div className="flex-shrink-0 bg-gray-200 p-2 rounded-full h-10 w-10 flex items-center justify-center">
+        <div className="shrink-0 bg-gray-200 p-2 rounded-full h-10 w-10 flex items-center justify-center">
           <User className="w-6 h-6 text-gray-700" />
         </div>
       )}
@@ -127,19 +128,35 @@ const ChatMessages = ({ messages }) => {
 export default function Home() {
   const { isSidebarOpen } = useOutletContext();
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const handlePromptClick = (prompt) => handleSend(prompt);
-  const handleSend = (message) => {
+
+  const handleSend = async (message) => {
     const userMsg = { id: Date.now(), role: "user", content: message };
     setMessages((prev) => [...prev, userMsg]);
-    setTimeout(() => {
+
+    try {
+      setLoading(true);
+      const response = await axiosClient.post("", { query: message });
       const botMsg = {
         id: Date.now() + 1,
         role: "assistant",
-        content: `I'm processing your question about: "${message}"`,
+        content: response?.data?.answer || "Sorry, I didn’t get that.",
       };
       setMessages((prev) => [...prev, botMsg]);
-    }, 1000);
+    } catch (err) {
+      console.error(err);
+      const errorMsg = {
+        id: Date.now() + 2,
+        role: "assistant",
+        content:
+          "There was an error connecting to the server. Please try again later.",
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -153,6 +170,12 @@ export default function Home() {
             </div>
           ) : (
             <ChatMessages messages={messages} />
+          )}
+
+          {loading && (
+            <p className="text-center text-sm text-gray-500 mt-4 animate-pulse">
+              Thinking...
+            </p>
           )}
         </div>
       </div>

@@ -1,5 +1,3 @@
-// src/components/Navbar.jsx
-
 import { BsChatQuote } from "react-icons/bs";
 import { PiUserCircle } from "react-icons/pi";
 import { Menu } from "lucide-react"; // 1. Import the Menu icon
@@ -31,7 +29,7 @@ const Navbar = ({ toggleSidebar }) => {
         {/* 6. Right Side: Nav Links and User Icon */}
         <div className="flex items-center gap-3 md:gap-6">
           <Link
-            href="/"
+            to=""
             className="rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700"
           >
             Chat
