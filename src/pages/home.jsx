@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { SendHorizontal, User, Bot } from "lucide-react";
 import axiosClient from "../api/axiosClient";
+import ReactMarkdown from "react-markdown";
 
 const Header = () => (
   <header className="text-center mb-10">
@@ -32,7 +33,7 @@ const ExamplePrompts = ({ onPromptClick }) => {
           <button
             key={prompt}
             onClick={() => onPromptClick(prompt)}
-            className="text-left text-black p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50 hover:shadow-md transition-all duration-200"
+            className="text-left text-black cursor-pointer p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50 hover:shadow-md transition-all duration-200"
           >
             {prompt}
           </button>
@@ -71,7 +72,7 @@ const ChatInput = ({ onSend, isSidebarOpen }) => {
         />
         <button
           type="submit"
-          className="rounded-lg bg-green-500 p-3 text-white shadow-md hover:bg-green-600"
+          className="rounded-lg bg-green-500 p-3 cursor-pointer text-white shadow-md hover:bg-green-600"
         >
           <SendHorizontal className="h-6 w-6" />
         </button>
@@ -80,9 +81,37 @@ const ChatInput = ({ onSend, isSidebarOpen }) => {
   );
 };
 
-const ChatMessage = ({ message }) => {
+const ChatMessage = ({ message, isLast }) => {
   const { role, content } = message;
   const isUser = role === "user";
+  const [displayedContent, setDisplayedContent] = useState(
+    isUser ? content : ""
+  );
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    // If it's a user message, show immediately.
+    // If we already animated this specific message, don't do it again.
+    if (isUser || hasAnimated.current) {
+      setDisplayedContent(content);
+      return;
+    }
+
+    // Start Typewriter Effect for Bot
+    let index = 0;
+    const intervalId = setInterval(() => {
+      setDisplayedContent((prev) => content.slice(0, index + 1));
+      index++;
+
+      if (index > content.length) {
+        clearInterval(intervalId);
+        hasAnimated.current = true; // Mark as done so it doesn't re-type on re-renders
+      }
+    }, 15); // Adjust speed here (lower = faster)
+
+    return () => clearInterval(intervalId);
+  }, [content, isUser]);
+
   return (
     <div
       className={`flex gap-4 p-4 ${isUser ? "justify-end" : "justify-start"}`}
@@ -92,15 +121,20 @@ const ChatMessage = ({ message }) => {
           <Bot className="w-6 h-6 text-green-600" />
         </div>
       )}
+
       <div
-        className={`max-w-xl p-4 rounded-lg ${
+        className={`max-w-xl p-4 rounded-lg text-left ${
           isUser
             ? "bg-teal-600 text-white rounded-br-none"
             : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none"
         }`}
       >
-        {content}
+        {/* Use ReactMarkdown to render bolding, lists, and newlines correctly */}
+        <div className="prose prose-sm max-w-none">
+          <ReactMarkdown>{displayedContent}</ReactMarkdown>
+        </div>
       </div>
+
       {isUser && (
         <div className="shrink-0 bg-gray-200 p-2 rounded-full h-10 w-10 flex items-center justify-center">
           <User className="w-6 h-6 text-gray-700" />
@@ -110,15 +144,22 @@ const ChatMessage = ({ message }) => {
   );
 };
 
+// Update ChatMessages to pass the 'isLast' prop
 const ChatMessages = ({ messages }) => {
   const endRef = useRef(null);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, messages.length]); // Scroll when messages change
+
   return (
     <div className="max-w-3xl mx-auto w-full">
-      {messages.map((msg) => (
-        <ChatMessage key={msg.id} message={msg} />
+      {messages.map((msg, index) => (
+        <ChatMessage
+          key={msg.id}
+          message={msg}
+          isLast={index === messages.length - 1}
+        />
       ))}
       <div ref={endRef} />
     </div>

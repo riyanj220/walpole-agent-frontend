@@ -104,9 +104,9 @@ const AuthPage = () => {
 
         {/* OR Separator */}
         <div className="flex items-center my-6">
-          <div className="flex-grow border-t border-gray-300" />
+          <div className="grow border-t border-gray-300" />
           <span className="px-3 text-sm text-gray-500 font-medium">OR</span>
-          <div className="flex-grow border-t border-gray-300" />
+          <div className="grow border-t border-gray-300" />
         </div>
 
         {/* Google Button */}
