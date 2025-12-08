@@ -22,7 +22,7 @@ const Navbar = ({ toggleSidebar }) => {
 
           <BsChatQuote className="hidden text-3xl text-teal-600 sm:block" />
           <span className="text-xl font-bold text-slate-800">
-            Walpole Agent
+            Walpole ProbStat Tutor
           </span>
         </div>
 
