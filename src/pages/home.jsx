@@ -179,11 +179,11 @@ export default function Home() {
 
     try {
       setLoading(true);
-      const response = await axiosClient.post("", { query: message });
+      const response = await axiosClient.post("/ask/", { query: message });
       const botMsg = {
         id: Date.now() + 1,
         role: "assistant",
-        content: response?.data?.answer || "Sorry, I didn’t get that.",
+        content: response?.data?.answer || "Sorry, I didn't get that.",
       };
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
