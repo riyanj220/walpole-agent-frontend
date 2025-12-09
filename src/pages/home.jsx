@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 const Header = () => (
   <header className="text-center mb-10">
     <h1 className="text-4xl font-bold text-gray-900 mb-3">
-      Welcome to Stats Advisor
+      Welcome to Walpole Tutor
     </h1>
     <p className="text-lg text-gray-600 max-w-xl mx-auto">
       Your AI-powered study companion for probability and statistics. Ask me
@@ -20,10 +20,10 @@ const Header = () => (
 
 const ExamplePrompts = ({ onPromptClick }) => {
   const prompts = [
-    "Explain Bayes' Theorem with a simple example",
-    "What is a p-value and how do I interpret it?",
-    "Help me understand the Central Limit Theorem",
-    "What's the difference between Type I and Type II errors?",
+    "Explain Binomial Probability Distribution",
+    "What is a exercise 3.4?",
+    "Please tell the answer of exercise 4.13",
+    "What is conditional probability?",
   ];
 
   return (
@@ -69,11 +69,11 @@ const ChatInput = ({ onSend, isSidebarOpen }) => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Ask a question about probability or statistics..."
-          className="flex-1 text-black rounded-lg border-2 border-transparent bg-gray-100 px-5 py-3 transition-all duration-200 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+          className="flex-1 text-black rounded-lg border-2 border-transparent bg-gray-100 px-5 py-3 transition-all duration-200 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600"
         />
         <button
           type="submit"
-          className="rounded-lg bg-green-500 p-3 cursor-pointer text-white shadow-md hover:bg-green-600"
+          className="rounded-lg bg-teal-600 p-3 cursor-pointer text-white shadow-md hover:bg-teal-700"
         >
           <SendHorizontal className="h-6 w-6" />
         </button>
@@ -197,7 +197,6 @@ const ChatMessage = ({ message, isLast }) => {
   );
 };
 
-// Update ChatMessages to pass the 'isLast' prop
 const ChatMessages = ({ messages }) => {
   const endRef = useRef(null);
 
