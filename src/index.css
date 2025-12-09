@@ -1,6 +1,25 @@
 @import "tailwindcss";
 @plugin 'tailwind-scrollbar';
 
+/* Center block math and add spacing above/below */
+/* Center any paragraph whose only content is a formula */
+.prose p > .katex-display,
+.prose p > .katex:only-child {
+  display: block !important;
+  margin-top: 1rem !important; /* space above */
+  margin-bottom: 1rem !important; /* space below */
+  margin-left: auto !important; /* center horizontally */
+  margin-right: auto !important;
+  text-align: center !important;
+}
+
+/* But keep inline math inline when it's mixed inside text */
+.prose :not(p) > .katex,
+.prose p > .katex:not(:only-child) {
+  display: inline-block !important;
+  margin: 0 !important;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

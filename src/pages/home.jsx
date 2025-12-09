@@ -1,9 +1,10 @@
-// src/pages/Home.jsx
 import { useState, useRef, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { SendHorizontal, User, Bot } from "lucide-react";
 import axiosClient from "../api/axiosClient";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 const Header = () => (
   <header className="text-center mb-10">
@@ -90,27 +91,74 @@ const ChatMessage = ({ message, isLast }) => {
   const hasAnimated = useRef(false);
 
   useEffect(() => {
-    // If it's a user message, show immediately.
-    // If we already animated this specific message, don't do it again.
-    if (isUser || hasAnimated.current) {
+    const isUserMessage = role === "user";
+
+    // User messages: no typing effect
+    if (isUserMessage) {
       setDisplayedContent(content);
       return;
     }
 
-    // Start Typewriter Effect for Bot
-    let index = 0;
-    const intervalId = setInterval(() => {
-      setDisplayedContent((prev) => content.slice(0, index + 1));
-      index++;
+    // Already animated once for this message
+    if (hasAnimated.current) {
+      setDisplayedContent(content);
+      return;
+    }
 
-      if (index > content.length) {
+    let i = 0;
+    const len = content.length;
+    let hasSeenMath = false; // becomes true after first math block
+
+    const intervalId = setInterval(() => {
+      if (i >= len) {
         clearInterval(intervalId);
-        hasAnimated.current = true; // Mark as done so it doesn't re-type on re-renders
+        hasAnimated.current = true;
+        return;
       }
-    }, 15); // Adjust speed here (lower = faster)
+
+      const ch = content[i];
+
+      // Normal character → type a chunk
+      if (ch !== "$") {
+        const step = hasSeenMath ? 3 : 1; // faster after math
+        i = Math.min(i + step, len);
+        setDisplayedContent(content.slice(0, i));
+        return;
+      }
+
+      // We hit a $ → decide if it's $...$ or $$...$$
+      let delim = "$";
+      if (i + 1 < len && content[i + 1] === "$") {
+        delim = "$$";
+      }
+
+      let j = i + delim.length;
+      let foundClosing = false;
+
+      while (j < len) {
+        if (content.startsWith(delim, j)) {
+          j += delim.length; // include closing delimiter
+          foundClosing = true;
+          break;
+        }
+        j += 1;
+      }
+
+      // If no closing delimiter, treat this '$' as a normal char
+      if (!foundClosing) {
+        i += 1;
+        setDisplayedContent(content.slice(0, i));
+        return;
+      }
+
+      // Jump over the whole math block and reveal it at once
+      hasSeenMath = true;
+      i = j;
+      setDisplayedContent(content.slice(0, i));
+    }, 15);
 
     return () => clearInterval(intervalId);
-  }, [content, isUser]);
+  }, [content, role]);
 
   return (
     <div
@@ -131,7 +179,12 @@ const ChatMessage = ({ message, isLast }) => {
       >
         {/* Use ReactMarkdown to render bolding, lists, and newlines correctly */}
         <div className="prose prose-sm max-w-none">
-          <ReactMarkdown>{displayedContent}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {displayedContent}
+          </ReactMarkdown>
         </div>
       </div>
 
@@ -166,6 +219,28 @@ const ChatMessages = ({ messages }) => {
   );
 };
 
+function normalizeMathMarkdown(text) {
+  return text
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+
+      // If the whole line is like: $ ... $
+      if (
+        trimmed.startsWith("$") &&
+        trimmed.endsWith("$") &&
+        !trimmed.startsWith("$$") &&
+        !trimmed.endsWith("$$")
+      ) {
+        // Convert: $...$  ->  $$...$$
+        return trimmed.replace(/^\$(.*)\$/, (_, inner) => `$$${inner}$$`);
+      }
+
+      return line;
+    })
+    .join("\n");
+}
+
 export default function Home() {
   const { isSidebarOpen } = useOutletContext();
   const [messages, setMessages] = useState([]);
@@ -180,10 +255,13 @@ export default function Home() {
     try {
       setLoading(true);
       const response = await axiosClient.post("/ask/", { query: message });
+      console.log(response?.data?.answer);
+      const rawAnswer = response?.data?.answer || "Sorry, I didn't get that.";
+      const normalizedAnswer = normalizeMathMarkdown(rawAnswer);
       const botMsg = {
         id: Date.now() + 1,
         role: "assistant",
-        content: response?.data?.answer || "Sorry, I didn't get that.",
+        content: normalizedAnswer,
       };
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
