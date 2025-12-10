@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { SendHorizontal, User, Bot } from "lucide-react";
+import { SendHorizontal, User, Bot, Square } from "lucide-react";
 import axiosClient from "../api/axiosClient";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -44,12 +44,12 @@ const ExamplePrompts = ({ onPromptClick }) => {
   );
 };
 
-const ChatInput = ({ onSend, isSidebarOpen }) => {
+const ChatInput = ({ onSend, isSidebarOpen, disabled, onStop, isTyping }) => {
   const [query, setQuery] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || disabled) return;
     onSend(query);
     setQuery("");
   };
@@ -60,73 +60,106 @@ const ChatInput = ({ onSend, isSidebarOpen }) => {
         isSidebarOpen ? "md:left-64" : "md:left-20"
       }`}
     >
-      <form
-        onSubmit={handleSubmit}
-        className="mx-auto flex max-w-3xl items-center gap-3 p-4"
-      >
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ask a question about probability or statistics..."
-          className="flex-1 text-black rounded-lg border-2 border-transparent bg-gray-100 px-5 py-3 transition-all duration-200 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600"
-        />
-        <button
-          type="submit"
-          className="rounded-lg bg-teal-600 p-3 cursor-pointer text-white shadow-md hover:bg-teal-700"
-        >
-          <SendHorizontal className="h-6 w-6" />
-        </button>
-      </form>
+      <div className="relative mx-auto max-w-3xl p-4">
+        {/* Stop Generating Button - Centered above input */}
+        {isTyping && (
+          <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
+            <button
+              onClick={onStop}
+              className="flex items-center cursor-pointer gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-md hover:bg-gray-50 text-sm font-medium transition-all"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              Stop generating
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex items-center gap-3">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={
+              disabled ? "Walpole is typing..." : "Ask a question..."
+            }
+            disabled={disabled}
+            className={`flex-1 text-black rounded-lg border-2 border-transparent bg-gray-100 px-5 py-3 transition-all duration-200 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600 ${
+              disabled ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          />
+          <button
+            type="submit"
+            disabled={disabled || !query.trim()}
+            className={`rounded-lg p-3 text-white shadow-md transition-colors ${
+              disabled || !query.trim()
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-teal-600 hover:bg-teal-700 cursor-pointer"
+            }`}
+          >
+            <SendHorizontal className="h-6 w-6" />
+          </button>
+        </form>
+      </div>
     </footer>
   );
 };
 
-const ChatMessage = ({ message, isLast }) => {
+const ChatMessage = ({ message, isLast, onTypingComplete, stopTypingRef }) => {
   const { role, content } = message;
   const isUser = role === "user";
   const [displayedContent, setDisplayedContent] = useState(
     isUser ? content : ""
   );
   const hasAnimated = useRef(false);
+  const wasStopped = useRef(false);
 
   useEffect(() => {
     const isUserMessage = role === "user";
 
-    // User messages: no typing effect
     if (isUserMessage) {
       setDisplayedContent(content);
       return;
     }
 
-    // Already animated once for this message
     if (hasAnimated.current) {
-      setDisplayedContent(content);
+      if (!wasStopped.current) {
+        setDisplayedContent(content);
+      }
       return;
     }
 
     let i = 0;
     const len = content.length;
-    let hasSeenMath = false; // becomes true after first math block
+    let hasSeenMath = false;
 
     const intervalId = setInterval(() => {
+      // 1. CHECK STOP REF
+      if (stopTypingRef.current) {
+        clearInterval(intervalId);
+        hasAnimated.current = true;
+        wasStopped.current = true;
+        if (isLast) onTypingComplete && onTypingComplete();
+        return;
+      }
+
       if (i >= len) {
         clearInterval(intervalId);
         hasAnimated.current = true;
+        if (isLast) {
+          onTypingComplete && onTypingComplete();
+        }
         return;
       }
 
       const ch = content[i];
 
-      // Normal character → type a chunk
       if (ch !== "$") {
-        const step = hasSeenMath ? 3 : 1; // faster after math
+        const step = hasSeenMath ? 3 : 1;
         i = Math.min(i + step, len);
         setDisplayedContent(content.slice(0, i));
         return;
       }
 
-      // We hit a $ → decide if it's $...$ or $$...$$
       let delim = "$";
       if (i + 1 < len && content[i + 1] === "$") {
         delim = "$$";
@@ -137,28 +170,26 @@ const ChatMessage = ({ message, isLast }) => {
 
       while (j < len) {
         if (content.startsWith(delim, j)) {
-          j += delim.length; // include closing delimiter
+          j += delim.length;
           foundClosing = true;
           break;
         }
         j += 1;
       }
 
-      // If no closing delimiter, treat this '$' as a normal char
       if (!foundClosing) {
         i += 1;
         setDisplayedContent(content.slice(0, i));
         return;
       }
 
-      // Jump over the whole math block and reveal it at once
       hasSeenMath = true;
       i = j;
       setDisplayedContent(content.slice(0, i));
     }, 15);
 
     return () => clearInterval(intervalId);
-  }, [content, role]);
+  }, [content, role, isLast, onTypingComplete, stopTypingRef]);
 
   return (
     <div
@@ -177,7 +208,6 @@ const ChatMessage = ({ message, isLast }) => {
             : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none"
         }`}
       >
-        {/* Use ReactMarkdown to render bolding, lists, and newlines correctly */}
         <div className="prose prose-sm max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
@@ -197,13 +227,7 @@ const ChatMessage = ({ message, isLast }) => {
   );
 };
 
-const ChatMessages = ({ messages }) => {
-  const endRef = useRef(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, messages.length]); // Scroll when messages change
-
+const ChatMessages = ({ messages, onTypingComplete, stopTypingRef }) => {
   return (
     <div className="max-w-3xl mx-auto w-full">
       {messages.map((msg, index) => (
@@ -211,9 +235,10 @@ const ChatMessages = ({ messages }) => {
           key={msg.id}
           message={msg}
           isLast={index === messages.length - 1}
+          onTypingComplete={onTypingComplete}
+          stopTypingRef={stopTypingRef}
         />
       ))}
-      <div ref={endRef} />
     </div>
   );
 };
@@ -223,18 +248,14 @@ function normalizeMathMarkdown(text) {
     .split("\n")
     .map((line) => {
       const trimmed = line.trim();
-
-      // If the whole line is like: $ ... $
       if (
         trimmed.startsWith("$") &&
         trimmed.endsWith("$") &&
         !trimmed.startsWith("$$") &&
         !trimmed.endsWith("$$")
       ) {
-        // Convert: $...$  ->  $$...$$
         return trimmed.replace(/^\$(.*)\$/, (_, inner) => `$$${inner}$$`);
       }
-
       return line;
     })
     .join("\n");
@@ -244,12 +265,29 @@ export default function Home() {
   const { isSidebarOpen } = useOutletContext();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // This ref is passed down to tell ChatMessage to break the loop
+  const stopTypingRef = useRef(false);
 
   const handlePromptClick = (prompt) => handleSend(prompt);
+
+  const handleTypingComplete = () => {
+    setIsTyping(false);
+    stopTypingRef.current = false; // Reset for next message
+  };
+
+  const handleStopTyping = () => {
+    stopTypingRef.current = true; // Signal child to stop
+    setIsTyping(false); // Unlock input immediately
+  };
 
   const handleSend = async (message) => {
     const userMsg = { id: Date.now(), role: "user", content: message };
     setMessages((prev) => [...prev, userMsg]);
+
+    // Reset stop ref before starting new request
+    stopTypingRef.current = false;
 
     try {
       setLoading(true);
@@ -262,6 +300,8 @@ export default function Home() {
         role: "assistant",
         content: normalizedAnswer,
       };
+
+      setIsTyping(true);
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
       console.error(err);
@@ -271,11 +311,14 @@ export default function Home() {
         content:
           "There was an error connecting to the server. Please try again later.",
       };
+      setIsTyping(true);
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setLoading(false);
     }
   };
+
+  const isInputDisabled = loading || isTyping;
 
   return (
     <div className="h-full relative">
@@ -287,7 +330,11 @@ export default function Home() {
               <ExamplePrompts onPromptClick={handlePromptClick} />
             </div>
           ) : (
-            <ChatMessages messages={messages} />
+            <ChatMessages
+              messages={messages}
+              onTypingComplete={handleTypingComplete}
+              stopTypingRef={stopTypingRef}
+            />
           )}
 
           {loading && (
@@ -297,7 +344,13 @@ export default function Home() {
           )}
         </div>
       </div>
-      <ChatInput onSend={handleSend} isSidebarOpen={isSidebarOpen} />
+      <ChatInput
+        onSend={handleSend}
+        isSidebarOpen={isSidebarOpen}
+        disabled={isInputDisabled}
+        isTyping={isTyping}
+        onStop={handleStopTyping}
+      />
     </div>
   );
 }
