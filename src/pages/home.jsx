@@ -104,7 +104,13 @@ const ChatInput = ({ onSend, isSidebarOpen, disabled, onStop, isTyping }) => {
   );
 };
 
-const ChatMessage = ({ message, isLast, onTypingComplete, stopTypingRef }) => {
+const ChatMessage = ({
+  message,
+  isLast,
+  onTypingComplete,
+  stopTypingRef,
+  scrollToBottom,
+}) => {
   const { role, content } = message;
   const isUser = role === "user";
   const [displayedContent, setDisplayedContent] = useState(
@@ -112,6 +118,13 @@ const ChatMessage = ({ message, isLast, onTypingComplete, stopTypingRef }) => {
   );
   const hasAnimated = useRef(false);
   const wasStopped = useRef(false);
+
+  // Auto-scroll effect: triggers whenever displayedContent updates
+  useEffect(() => {
+    if (isLast && scrollToBottom) {
+      scrollToBottom();
+    }
+  }, [displayedContent, isLast, scrollToBottom]);
 
   useEffect(() => {
     const isUserMessage = role === "user";
@@ -195,8 +208,9 @@ const ChatMessage = ({ message, isLast, onTypingComplete, stopTypingRef }) => {
     <div
       className={`flex gap-4 p-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
+      {/* Desktop Bot Icon: Hidden on small screens, visible on md+ */}
       {!isUser && (
-        <div className="shrink-0 bg-green-100 p-2 rounded-full h-10 w-10 flex items-center justify-center">
+        <div className="hidden md:flex shrink-0 bg-green-100 p-2 rounded-full h-10 w-10 items-center justify-center">
           <Bot className="w-6 h-6 text-green-600" />
         </div>
       )}
@@ -205,10 +219,17 @@ const ChatMessage = ({ message, isLast, onTypingComplete, stopTypingRef }) => {
         className={`max-w-xl p-4 rounded-lg text-left ${
           isUser
             ? "bg-teal-600 text-white rounded-br-none"
-            : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none"
+            : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none w-full"
         }`}
       >
         <div className="prose prose-sm max-w-none">
+          {/* Mobile Bot Icon: Floated left inside the text container. Hidden on md+ */}
+          {!isUser && (
+            <div className="float-left mr-3 mb-1 md:hidden bg-green-100 p-1.5 rounded-full h-8 w-8 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-green-600" />
+            </div>
+          )}
+
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
             rehypePlugins={[rehypeKatex]}
@@ -217,17 +238,21 @@ const ChatMessage = ({ message, isLast, onTypingComplete, stopTypingRef }) => {
           </ReactMarkdown>
         </div>
       </div>
-
+      {/* 
       {isUser && (
         <div className="shrink-0 bg-gray-200 p-2 rounded-full h-10 w-10 flex items-center justify-center">
           <User className="w-6 h-6 text-gray-700" />
         </div>
-      )}
+      )} */}
     </div>
   );
 };
-
-const ChatMessages = ({ messages, onTypingComplete, stopTypingRef }) => {
+const ChatMessages = ({
+  messages,
+  onTypingComplete,
+  stopTypingRef,
+  scrollToBottom,
+}) => {
   return (
     <div className="max-w-3xl mx-auto w-full">
       {messages.map((msg, index) => (
@@ -237,6 +262,7 @@ const ChatMessages = ({ messages, onTypingComplete, stopTypingRef }) => {
           isLast={index === messages.length - 1}
           onTypingComplete={onTypingComplete}
           stopTypingRef={stopTypingRef}
+          scrollToBottom={scrollToBottom}
         />
       ))}
     </div>
@@ -267,8 +293,20 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
+  // Ref to track the end of messages for auto-scrolling
+  const messagesEndRef = useRef(null);
+
   // This ref is passed down to tell ChatMessage to break the loop
   const stopTypingRef = useRef(false);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Scroll to bottom whenever messages array changes (e.g., new message added)
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handlePromptClick = (prompt) => handleSend(prompt);
 
@@ -330,11 +368,16 @@ export default function Home() {
               <ExamplePrompts onPromptClick={handlePromptClick} />
             </div>
           ) : (
-            <ChatMessages
-              messages={messages}
-              onTypingComplete={handleTypingComplete}
-              stopTypingRef={stopTypingRef}
-            />
+            <>
+              <ChatMessages
+                messages={messages}
+                onTypingComplete={handleTypingComplete}
+                stopTypingRef={stopTypingRef}
+                scrollToBottom={scrollToBottom}
+              />
+              {/* Invisible element to scroll to */}
+              <div ref={messagesEndRef} />
+            </>
           )}
 
           {loading && (
