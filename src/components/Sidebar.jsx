@@ -1,25 +1,34 @@
 import {
   Plus,
   Settings,
-  Menu, // For the desktop toggle
-  X, // For the mobile close button
+  Menu,
+  X,
+  LogOut,
+  LogIn,
+  History,
+  MessageSquare,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
+// Hardcoded for now, will be fetched from Supabase later
 const chatHistory = [
   { id: 1, title: "Bayes' Theorem explanation" },
   { id: 2, title: "P-value interpretation" },
   { id: 3, title: "Central Limit Theorem" },
   { id: 4, title: "Hypothesis testing steps" },
   { id: 5, title: "Type I vs Type II Errors" },
-  { id: 6, title: "Understanding Confidence Intervals" },
-  { id: 7, title: "Understanding Confidence Intervals" },
-  { id: 8, title: "Understanding Confidence Intervals" },
-  { id: 9, title: "Understanding Confidence Intervals" },
-  { id: 10, title: "Understanding Confidence Intervals" },
-  { id: 11, title: "Understanding Confidence Intervals" },
 ];
 
 const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth"); // Optional: Redirect after logout
+  };
+
   return (
     <aside
       className={`fixed top-0 left-0 z-30 flex h-screen flex-col justify-between bg-slate-100 p-4 shadow-lg transition-all duration-300
@@ -62,7 +71,6 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
           `}
         >
           <Plus className="h-5 w-5 shrink-0 pl-0.5" />
-          {/* 5. Conditionally render text */}
           <span
             className={`truncate transition-opacity ${
               isSidebarOpen ? "opacity-100" : "opacity-0"
@@ -72,16 +80,10 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
           </span>
         </button>
 
-        {/* 6. Previous Conversations */}
+        {/* 6. Previous Conversations / Login Prompt */}
         {isSidebarOpen && (
           <div className="mt-6 flex flex-1 flex-col min-h-0">
-            {/* 7. Conditionally render heading */}
             <h3
-              // ---------------------------------------------------------------
-              // FIX 2 (Continued):
-              // 1. Added `truncate` to clip "Previous Conversations".
-              // 2. Removed `md:hidden` from the conditional classes.
-              // ---------------------------------------------------------------
               className={`truncate text-xs font-semibold uppercase tracking-wider text-slate-500 transition-all ${
                 isSidebarOpen
                   ? "mb-3 text-left"
@@ -98,56 +100,75 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
                   : "scrollbar-none"
               }`}
             >
-              <ul className="flex flex-col gap-1">
-                {chatHistory.map((chat) => (
-                  <li key={chat.id}>
-                    <a
-                      href="#"
-                      className={`group flex items-center gap-3 rounded-md p-2 text-slate-700 hover:bg-slate-200 ${
-                        isSidebarOpen
-                          ? "justify-start"
-                          : "justify-center md:justify-start"
-                      }`}
-                    >
-                      <span
-                        // -----------------------------------------------------
-                        // FIX 2 (Continued):
-                        // 1. Changed `transition-all` to `transition-opacity` to be specific.
-                        // 2. Removed `md:hidden`. The `truncate` class (which
-                        //    you already had) will handle the clipping.
-                        // -----------------------------------------------------
-                        className={`text-sm truncate transition-opacity ${
-                          isSidebarOpen ? "opacity-100" : "opacity-0"
+              {user ? (
+                // SCENARIO A: USER LOGGED IN - SHOW HISTORY
+                <ul className="flex flex-col gap-1">
+                  {chatHistory.map((chat) => (
+                    <li key={chat.id}>
+                      <a
+                        href="#"
+                        className={`group flex items-center gap-3 rounded-md p-2 text-slate-700 hover:bg-slate-200 ${
+                          isSidebarOpen
+                            ? "justify-start"
+                            : "justify-center md:justify-start"
                         }`}
                       >
-                        {chat.title}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+                        <MessageSquare className="h-4 w-4 shrink-0 text-slate-400" />
+                        <span
+                          className={`text-sm truncate transition-opacity ${
+                            isSidebarOpen ? "opacity-100" : "opacity-0"
+                          }`}
+                        >
+                          {chat.title}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                // SCENARIO B: USER LOGGED OUT - SHOW LOGIN BUTTON
+                <div className="flex flex-col items-center justify-center h-40 text-center space-y-3 p-2 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                  <History className="h-8 w-8 text-slate-300" />
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-500 leading-tight">
+                      Sign in to save your chat history
+                    </p>
+                    <button
+                      onClick={() => navigate("/auth")}
+                      className="text-xs text-slate-700 bg-white border border-slate-300 px-3 py-1.5 rounded shadow-sm hover:bg-slate-50 hover:text-teal-600 transition-colors flex items-center gap-2 mx-auto cursor-pointer"
+                    >
+                      <LogIn className="h-3 w-3" />
+                      Sign In
+                    </button>
+                  </div>
+                </div>
+              )}
             </nav>
           </div>
         )}
       </div>
 
-      {/* 9. Bottom Section (Settings) */}
+      {/* 9. Bottom Section (Settings or Sign Out) */}
       <div className="shrink-0 border-t border-slate-300 pt-4">
-        <a
-          href="#"
-          className={`flex items-center gap-3 rounded-md p-2 text-slate-700 hover:bg-slate-200 ${
-            isSidebarOpen ? "justify-start" : "justify-center md:justify-start"
-          }`}
-        >
-          <Settings className="h-5 w-5 shrink-0" />
-          <span
-            className={`text-sm truncate transition-opacity ${
-              isSidebarOpen ? "opacity-100" : "opacity-0"
+        {user && (
+          <button
+            onClick={handleSignOut}
+            className={`flex w-full items-center gap-3 cursor-pointer rounded-md p-2 text-red-600 hover:bg-red-50 ${
+              isSidebarOpen
+                ? "justify-start"
+                : "justify-center md:justify-start"
             }`}
           >
-            Settings
-          </span>
-        </a>
+            <LogOut className="h-5 w-5 shrink-0" />
+            <span
+              className={`text-sm truncate transition-opacity ${
+                isSidebarOpen ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              Sign Out
+            </span>
+          </button>
+        )}
       </div>
     </aside>
   );

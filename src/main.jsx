@@ -4,11 +4,14 @@ import "katex/dist/katex.min.css";
 import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>
 );
