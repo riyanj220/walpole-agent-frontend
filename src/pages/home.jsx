@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom"; // Added useSearchParams
 import { SendHorizontal, User, Bot, Square } from "lucide-react";
 import axiosClient from "../api/axiosClient";
+import supabase from "../api/supabaseClient"; // Need Supabase to fetch history
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { useAuth } from "../context/AuthContext";
 
 const Header = () => (
   <header className="text-center mb-10">
@@ -119,7 +121,7 @@ const ChatMessage = ({
   const hasAnimated = useRef(false);
   const wasStopped = useRef(false);
 
-  // Auto-scroll effect: triggers whenever displayedContent updates
+  // Auto-scroll effect
   useEffect(() => {
     if (isLast && scrollToBottom) {
       scrollToBottom();
@@ -128,6 +130,12 @@ const ChatMessage = ({
 
   useEffect(() => {
     const isUserMessage = role === "user";
+
+    // If it's a history message (already loaded), don't animate typing
+    if (message.noAnimation) {
+      setDisplayedContent(content);
+      return;
+    }
 
     if (isUserMessage) {
       setDisplayedContent(content);
@@ -146,7 +154,6 @@ const ChatMessage = ({
     let hasSeenMath = false;
 
     const intervalId = setInterval(() => {
-      // 1. CHECK STOP REF
       if (stopTypingRef.current) {
         clearInterval(intervalId);
         hasAnimated.current = true;
@@ -202,13 +209,19 @@ const ChatMessage = ({
     }, 15);
 
     return () => clearInterval(intervalId);
-  }, [content, role, isLast, onTypingComplete, stopTypingRef]);
+  }, [
+    content,
+    role,
+    isLast,
+    onTypingComplete,
+    stopTypingRef,
+    message.noAnimation,
+  ]);
 
   return (
     <div
       className={`flex gap-4 p-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
-      {/* Desktop Bot Icon: Hidden on small screens, visible on md+ */}
       {!isUser && (
         <div className="hidden md:flex shrink-0 bg-green-100 p-2 rounded-full h-10 w-10 items-center justify-center">
           <Bot className="w-6 h-6 text-green-600" />
@@ -223,7 +236,6 @@ const ChatMessage = ({
         }`}
       >
         <div className="prose prose-sm max-w-none">
-          {/* Mobile Bot Icon: Floated left inside the text container. Hidden on md+ */}
           {!isUser && (
             <div className="float-left mr-3 mb-1 md:hidden bg-green-100 p-1.5 rounded-full h-8 w-8 flex items-center justify-center">
               <Bot className="w-5 h-5 text-green-600" />
@@ -238,15 +250,10 @@ const ChatMessage = ({
           </ReactMarkdown>
         </div>
       </div>
-      {/* 
-      {isUser && (
-        <div className="shrink-0 bg-gray-200 p-2 rounded-full h-10 w-10 flex items-center justify-center">
-          <User className="w-6 h-6 text-gray-700" />
-        </div>
-      )} */}
     </div>
   );
 };
+
 const ChatMessages = ({
   messages,
   onTypingComplete,
@@ -289,50 +296,107 @@ function normalizeMathMarkdown(text) {
 
 export default function Home() {
   const { isSidebarOpen } = useOutletContext();
+  const { user } = useAuth();
+
+  // URL Params to check if we are loading an old chat
+  const [searchParams] = useSearchParams();
+  const urlChatId = searchParams.get("chatId");
+
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Ref to track the end of messages for auto-scrolling
-  const messagesEndRef = useRef(null);
+  // Initialize chatId from URL if present
+  const [chatId, setChatId] = useState(urlChatId || null);
 
-  // This ref is passed down to tell ChatMessage to break the loop
+  const messagesEndRef = useRef(null);
   const stopTypingRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Scroll to bottom whenever messages array changes (e.g., new message added)
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // =========================================================
+  // 🆕 LOAD HISTORY LOGIC
+  // =========================================================
+  useEffect(() => {
+    // If URL has a chatId, load that chat
+    if (urlChatId) {
+      setChatId(urlChatId);
+      loadChatHistory(urlChatId);
+    } else {
+      // If no URL param, reset (New Chat)
+      setChatId(null);
+      setMessages([]);
+    }
+  }, [urlChatId]);
+
+  const loadChatHistory = async (id) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("chat_id", id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading chat:", error);
+    } else if (data) {
+      // Map DB messages to UI format & disable animation for history
+      const history = data.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        noAnimation: true, // IMPORTANT: Flag to skip typing effect
+      }));
+      setMessages(history);
+    }
+    setLoading(false);
+  };
+  // =========================================================
 
   const handlePromptClick = (prompt) => handleSend(prompt);
 
   const handleTypingComplete = () => {
     setIsTyping(false);
-    stopTypingRef.current = false; // Reset for next message
+    stopTypingRef.current = false;
   };
 
   const handleStopTyping = () => {
-    stopTypingRef.current = true; // Signal child to stop
-    setIsTyping(false); // Unlock input immediately
+    stopTypingRef.current = true;
+    setIsTyping(false);
   };
 
   const handleSend = async (message) => {
     const userMsg = { id: Date.now(), role: "user", content: message };
     setMessages((prev) => [...prev, userMsg]);
 
-    // Reset stop ref before starting new request
     stopTypingRef.current = false;
 
     try {
       setLoading(true);
-      const response = await axiosClient.post("/ask/", { query: message });
-      console.log(response?.data?.answer);
+
+      const payload = {
+        query: message,
+        user_id: user?.id || null,
+        chat_id: chatId,
+      };
+
+      const response = await axiosClient.post("/ask/", payload);
+
+      if (response.data.chat_id) {
+        setChatId(response.data.chat_id);
+        // Optional: Update URL without reload to reflect new ID
+        // window.history.pushState({}, '', `/?chatId=${response.data.chat_id}`);
+      }
+
       const rawAnswer = response?.data?.answer || "Sorry, I didn't get that.";
       const normalizedAnswer = normalizeMathMarkdown(rawAnswer);
+
       const botMsg = {
         id: Date.now() + 1,
         role: "assistant",
@@ -346,8 +410,7 @@ export default function Home() {
       const errorMsg = {
         id: Date.now() + 2,
         role: "assistant",
-        content:
-          "There was an error connecting to the server. Please try again later.",
+        content: "There was an error connecting to the server.",
       };
       setIsTyping(true);
       setMessages((prev) => [...prev, errorMsg]);
@@ -375,7 +438,6 @@ export default function Home() {
                 stopTypingRef={stopTypingRef}
                 scrollToBottom={scrollToBottom}
               />
-              {/* Invisible element to scroll to */}
               <div ref={messagesEndRef} />
             </>
           )}
