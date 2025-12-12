@@ -390,8 +390,12 @@ export default function Home() {
 
       if (response.data.chat_id) {
         setChatId(response.data.chat_id);
-        // Optional: Update URL without reload to reflect new ID
-        // window.history.pushState({}, '', `/?chatId=${response.data.chat_id}`);
+
+        // If we just started a new chat (URL doesn't have ID yet), update the URL silently
+        if (!chatId) {
+          const newUrl = `${window.location.pathname}?chatId=${response.data.chat_id}`;
+          window.history.pushState({ path: newUrl }, "", newUrl);
+        }
       }
 
       const rawAnswer = response?.data?.answer || "Sorry, I didn't get that.";

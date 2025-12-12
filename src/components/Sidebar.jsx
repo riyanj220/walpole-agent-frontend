@@ -44,6 +44,29 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
     };
 
     fetchChats();
+
+    //  Realtime Subscription: Listen for new chats
+    const channel = supabase
+      .channel("public:chats")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chats",
+          filter: `user_id=eq.${user.id}`, // Only listen for THIS user's chats
+        },
+        (payload) => {
+          // Add the new chat to the top of the list instantly
+          setChats((prev) => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   // Close menu when clicking outside
@@ -63,7 +86,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
   };
 
   const handleNewChat = () => {
-    navigate("/"); // Navigate to root without params to reset
+    window.location.href = "/"; // Navigate to root without params to reset
   };
 
   const handleChatClick = (chatId) => {
