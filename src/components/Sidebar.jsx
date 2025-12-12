@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Plus,
-  Settings,
   Menu,
   X,
   LogOut,
@@ -147,7 +146,6 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
           </span>
         </button>
 
-        {/* Previous Conversations */}
         {/* Previous Conversations - Horizontal Slide Animation */}
         <div
           className={`flex flex-col flex-1 min-h-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
@@ -184,7 +182,7 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
                       {/* 3 Dots Menu Button */}
                       <button
                         onClick={(e) => toggleMenu(e, chat.id)}
-                        className="cursor-pointer opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-300 rounded transition-opacity"
+                        className="cursor-pointer group-hover:opacity-100 p-1 hover:bg-slate-300 rounded transition-opacity"
                       >
                         <MoreVertical className="h-4 w-4 text-slate-500" />
                       </button>

@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom"; // Added useSearchParams
-import { SendHorizontal, User, Bot, Square } from "lucide-react";
+import { SendHorizontal, Bot, Square } from "lucide-react";
 import axiosClient from "../api/axiosClient";
 import supabase from "../api/supabaseClient"; // Need Supabase to fetch history
 import ReactMarkdown from "react-markdown";
@@ -321,7 +321,7 @@ export default function Home() {
   }, [messages]);
 
   // =========================================================
-  // 🆕 LOAD HISTORY LOGIC
+  // LOAD HISTORY LOGIC
   // =========================================================
   useEffect(() => {
     // If URL has a chatId, load that chat
@@ -361,10 +361,10 @@ export default function Home() {
 
   const handlePromptClick = (prompt) => handleSend(prompt);
 
-  const handleTypingComplete = () => {
+  const handleTypingComplete = useCallback(() => {
     setIsTyping(false);
     stopTypingRef.current = false;
-  };
+  }, []);
 
   const handleStopTyping = () => {
     stopTypingRef.current = true;

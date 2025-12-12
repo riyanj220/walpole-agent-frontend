@@ -2,9 +2,13 @@ import { BsChatQuote } from "react-icons/bs";
 import { PiUserCircle } from "react-icons/pi";
 import { Menu } from "lucide-react"; // 1. Import the Menu icon
 import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 // 2. Accept `toggleSidebar` as a prop
 const Navbar = ({ toggleSidebar }) => {
+  const location = useLocation(); // 2. Get current route
+  const isAuthPage = location.pathname === "/auth";
+
   return (
     // 3. Add sticky and z-index to keep it on top of content
     <nav className="sticky top-0 z-10 w-full bg-slate-100/80 px-4 py-4 backdrop-blur-sm md:px-8">
@@ -12,13 +16,15 @@ const Navbar = ({ toggleSidebar }) => {
         {/* 4. Left Side: Logo and Title */}
         <div className="flex items-center gap-3">
           {/* 5. Mobile-only Menu button */}
-          <button
-            onClick={toggleSidebar}
-            className="p-1 text-slate-700 hover:text-slate-900 md:hidden"
-            aria-label="Open sidebar"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+          {!isAuthPage && (
+            <button
+              onClick={toggleSidebar}
+              className="p-1 text-slate-700 hover:text-slate-900 md:hidden"
+              aria-label="Open sidebar"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          )}
 
           <BsChatQuote className="hidden text-3xl text-teal-600 sm:block" />
           <span className="text-xl font-bold text-slate-800">
