@@ -302,7 +302,18 @@ export default function Home() {
   const [searchParams] = useSearchParams();
   const urlChatId = searchParams.get("chatId");
 
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    if (!user) {
+      const saved = sessionStorage.getItem("guest_messages");
+
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((msg) => ({ ...msg, noAnimation: true }));
+      }
+    }
+    return [];
+  });
+
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -311,6 +322,19 @@ export default function Home() {
 
   const messagesEndRef = useRef(null);
   const stopTypingRef = useRef(false);
+
+  useEffect(() => {
+    if (!user) {
+      sessionStorage.setItem("guest_messages", JSON.stringify(messages));
+    }
+  }, [messages, user]);
+
+  // Clear session storage if user logs in
+  useEffect(() => {
+    if (user) {
+      sessionStorage.removeItem("guest_messages");
+    }
+  }, [user]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -324,16 +348,17 @@ export default function Home() {
   // LOAD HISTORY LOGIC
   // =========================================================
   useEffect(() => {
-    // If URL has a chatId, load that chat
-    if (urlChatId) {
+    if (urlChatId && user) {
       setChatId(urlChatId);
       loadChatHistory(urlChatId);
+    } else if (!user) {
+      // If guest, ensure chatID is null
+      setChatId(null);
     } else {
-      // If no URL param, reset (New Chat)
       setChatId(null);
       setMessages([]);
     }
-  }, [urlChatId]);
+  }, [urlChatId, user]);
 
   const loadChatHistory = async (id) => {
     setLoading(true);
@@ -380,10 +405,18 @@ export default function Home() {
     try {
       setLoading(true);
 
+      let guestHistory = [];
+      if (!user) {
+        // Take last 6 messages
+        // Format them as arrays: ["role", "content"]
+        guestHistory = messages.slice(-6).map((msg) => [msg.role, msg.content]);
+      }
+
       const payload = {
         query: message,
         user_id: user?.id || null,
         chat_id: chatId,
+        chat_history: guestHistory,
       };
 
       const response = await axiosClient.post("/ask/", payload);
