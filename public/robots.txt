@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Don't try to index the auth page or internal API calls
+Disallow: /auth
+Disallow: /api/
+
+# Point to your sitemap
+Sitemap: https://www.walpoletutor.me/sitemap.xml
