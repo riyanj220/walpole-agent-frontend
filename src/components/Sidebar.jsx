@@ -86,6 +86,9 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
   };
 
   const handleNewChat = () => {
+    if (!user) {
+      sessionStorage.removeItem("guest_messages");
+    }
     window.location.href = "/"; // Navigate to root without params to reset
   };
 
