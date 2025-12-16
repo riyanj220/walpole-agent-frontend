@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { useAuth } from "../context/AuthContext";
+import WelcomeModal from "../components/WelcomeModal";
 
 const Header = () => (
   <header className="text-center mb-10">
@@ -460,6 +461,7 @@ export default function Home() {
 
   return (
     <div className="h-full relative">
+      <WelcomeModal />
       <div className="h-full overflow-y-auto">
         <div className="p-1 md:p-8 pb-24 lg:pb-[100px]">
           {messages.length === 0 ? (
