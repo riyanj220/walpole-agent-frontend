@@ -1,13 +1,21 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useOutletContext, useSearchParams } from "react-router-dom"; // Added useSearchParams
-import { SendHorizontal, Bot, Square } from "lucide-react";
+import { useOutletContext, useSearchParams } from "react-router-dom";
+import {
+  SendHorizontal,
+  Bot,
+  Square,
+  Sparkles,
+  Brain,
+  Search,
+} from "lucide-react";
 import axiosClient from "../api/axiosClient";
-import supabase from "../api/supabaseClient"; // Need Supabase to fetch history
+import supabase from "../api/supabaseClient";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { useAuth } from "../context/AuthContext";
 import WelcomeModal from "../components/WelcomeModal";
+import ThinkingIndicator from "../components/ThinkingIndicators";
 
 const Header = () => (
   <header className="text-center mb-10">
@@ -64,7 +72,7 @@ const ChatInput = ({ onSend, isSidebarOpen, disabled, onStop, isTyping }) => {
       }`}
     >
       <div className="relative mx-auto max-w-3xl p-4">
-        {/* Stop Generating Button - Centered above input */}
+        {/* Stop Generating Button */}
         {isTyping && (
           <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
             <button
@@ -83,7 +91,7 @@ const ChatInput = ({ onSend, isSidebarOpen, disabled, onStop, isTyping }) => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={
-              disabled ? "Walpole is typing..." : "Ask a question..."
+              disabled ? "Walpole is thinking..." : "Ask a question..."
             }
             disabled={disabled}
             className={`flex-1 text-black rounded-lg border-2 border-transparent bg-gray-100 px-5 py-3 transition-all duration-200 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600 ${
@@ -107,6 +115,9 @@ const ChatInput = ({ onSend, isSidebarOpen, disabled, onStop, isTyping }) => {
   );
 };
 
+// ============================================================================
+// 3. ChatMessage (Updated with Metadata Badges)
+// ============================================================================
 const ChatMessage = ({
   message,
   isLast,
@@ -114,7 +125,7 @@ const ChatMessage = ({
   stopTypingRef,
   scrollToBottom,
 }) => {
-  const { role, content } = message;
+  const { role, content, metadata } = message;
   const isUser = role === "user";
   const [displayedContent, setDisplayedContent] = useState(
     isUser ? content : ""
@@ -129,6 +140,7 @@ const ChatMessage = ({
     }
   }, [displayedContent, isLast, scrollToBottom]);
 
+  // Typing Effect Logic
   useEffect(() => {
     const isUserMessage = role === "user";
 
@@ -174,13 +186,15 @@ const ChatMessage = ({
 
       const ch = content[i];
 
+      // Typing speed logic: slow down for math
       if (ch !== "$") {
-        const step = hasSeenMath ? 3 : 1;
+        const step = hasSeenMath ? 3 : 2; // Slightly adjusted speed
         i = Math.min(i + step, len);
         setDisplayedContent(content.slice(0, i));
         return;
       }
 
+      // Check for math delimiters
       let delim = "$";
       if (i + 1 < len && content[i + 1] === "$") {
         delim = "$$";
@@ -219,6 +233,38 @@ const ChatMessage = ({
     message.noAnimation,
   ]);
 
+  // Helper to render Metadata Badge
+  const renderMetadataBadge = () => {
+    if (isUser || !metadata) return null;
+
+    // Check mode from backend response
+    if (metadata.mode === "agent") {
+      return (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-md mb-2 w-fit border border-purple-100">
+          <Brain size={12} />
+          <span>AI Reasoning Agent</span>
+        </div>
+      );
+    }
+    if (metadata.mode === "direct" || metadata.mode?.startsWith("targeted")) {
+      return (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-md mb-2 w-fit border border-blue-100">
+          <Search size={12} />
+          <span>Direct Textbook Search</span>
+        </div>
+      );
+    }
+    if (metadata.mode === "general_chat") {
+      return (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-md mb-2 w-fit border border-orange-100">
+          <Sparkles size={12} />
+          <span>General Chat</span>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div
       className={`flex gap-4 p-4 ${isUser ? "justify-end" : "justify-start"}`}
@@ -236,6 +282,9 @@ const ChatMessage = ({
             : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none w-full"
         }`}
       >
+        {/* Render Badge Above Content */}
+        {renderMetadataBadge()}
+
         <div className="prose prose-sm max-w-none">
           {!isUser && (
             <div className="float-left mr-3 mb-1 md:hidden bg-green-100 p-1.5 rounded-full h-8 w-8 flex items-center justify-center">
@@ -295,6 +344,9 @@ function normalizeMathMarkdown(text) {
     .join("\n");
 }
 
+// ============================================================================
+// 4. Main Home Component
+// ============================================================================
 export default function Home() {
   const { isSidebarOpen } = useOutletContext();
   const { user } = useAuth();
@@ -341,9 +393,10 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Scroll on new messages or when loading starts
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, loading]);
 
   // =========================================================
   // LOAD HISTORY LOGIC
@@ -377,7 +430,10 @@ export default function Home() {
         id: msg.id,
         role: msg.role,
         content: msg.content,
-        noAnimation: true, // IMPORTANT: Flag to skip typing effect
+        noAnimation: true,
+        // Note: Unless you store metadata in DB, old messages won't have badges.
+        // That is expected behavior for now.
+        metadata: msg.metadata || null,
       }));
       setMessages(history);
     }
@@ -404,12 +460,11 @@ export default function Home() {
     stopTypingRef.current = false;
 
     try {
-      setLoading(true);
+      setLoading(true); // START LOADING (Triggers ThinkingIndicator)
 
       let guestHistory = [];
       if (!user) {
         // Take last 6 messages
-        // Format them as arrays: ["role", "content"]
         guestHistory = messages.slice(-6).map((msg) => [msg.role, msg.content]);
       }
 
@@ -435,10 +490,17 @@ export default function Home() {
       const rawAnswer = response?.data?.answer || "Sorry, I didn't get that.";
       const normalizedAnswer = normalizeMathMarkdown(rawAnswer);
 
+      // Capture metadata from backend for the badge
+      const responseMetadata = {
+        mode: response.data.mode,
+        chapter: response.data.metadata?.chapter,
+      };
+
       const botMsg = {
         id: Date.now() + 1,
         role: "assistant",
         content: normalizedAnswer,
+        metadata: responseMetadata, // Pass it to message
       };
 
       setIsTyping(true);
@@ -453,7 +515,7 @@ export default function Home() {
       setIsTyping(true);
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
-      setLoading(false);
+      setLoading(false); // STOP LOADING (Removes ThinkingIndicator)
     }
   };
 
@@ -477,14 +539,16 @@ export default function Home() {
                 stopTypingRef={stopTypingRef}
                 scrollToBottom={scrollToBottom}
               />
+
+              {/* Thinking Indicator appears here while waiting */}
+              {loading && (
+                <div className="max-w-3xl mx-auto w-full">
+                  <ThinkingIndicator />
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </>
-          )}
-
-          {loading && (
-            <p className="text-center text-sm text-gray-500 mt-4 animate-pulse">
-              Thinking...
-            </p>
           )}
         </div>
       </div>
