@@ -31,10 +31,10 @@ const Header = () => (
 
 const ExamplePrompts = ({ onPromptClick }) => {
   const prompts = [
-    "Explain Binomial Probability Distribution",
-    "What is a exercise 3.4?",
-    "Please tell the answer of exercise 4.13",
     "What is conditional probability?",
+    "Exercise 3.5?",
+    "Explain multinomial probability distribution",
+    "Please tell the answer of exercise 3.5",
   ];
 
   return (
