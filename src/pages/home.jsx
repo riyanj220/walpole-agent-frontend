@@ -128,7 +128,7 @@ const ChatMessage = ({
   const { role, content, metadata } = message;
   const isUser = role === "user";
   const [displayedContent, setDisplayedContent] = useState(
-    isUser ? content : ""
+    isUser ? content : "",
   );
   const hasAnimated = useRef(false);
   const wasStopped = useRef(false);
@@ -140,17 +140,10 @@ const ChatMessage = ({
     }
   }, [displayedContent, isLast, scrollToBottom]);
 
-  // Typing Effect Logic
   useEffect(() => {
     const isUserMessage = role === "user";
 
-    // If it's a history message (already loaded), don't animate typing
-    if (message.noAnimation) {
-      setDisplayedContent(content);
-      return;
-    }
-
-    if (isUserMessage) {
+    if (message.noAnimation || isUserMessage) {
       setDisplayedContent(content);
       return;
     }
@@ -164,11 +157,14 @@ const ChatMessage = ({
 
     let i = 0;
     const len = content.length;
-    let hasSeenMath = false;
+
+    // Calculate a dynamic chunk size to ensure the animation finishes in ~1.5 seconds.
+    // 1500ms total duration / 30ms interval = ~50 total frames/ticks.
+    const dynamicStep = Math.max(3, Math.ceil(len / 50)); // Math.ceil() rounds a number up to the next largest integer.
 
     const intervalId = setInterval(() => {
       if (stopTypingRef.current) {
-        clearInterval(intervalId);
+        clearInterval(intervalId); // Stops the execution of the function specified in setInterval.
         hasAnimated.current = true;
         wasStopped.current = true;
         if (isLast) onTypingComplete && onTypingComplete();
@@ -186,15 +182,13 @@ const ChatMessage = ({
 
       const ch = content[i];
 
-      // Typing speed logic: slow down for math
       if (ch !== "$") {
-        const step = hasSeenMath ? 3 : 2; // Slightly adjusted speed
-        i = Math.min(i + step, len);
-        setDisplayedContent(content.slice(0, i));
+        i = Math.min(i + dynamicStep, len); // Math.min() returns the lowest-valued number passed into it.
+        setDisplayedContent(content.slice(0, i)); // String.slice() extracts a section of a string and returns it as a new string.
         return;
       }
 
-      // Check for math delimiters
+      // Math delimiter skipping logic
       let delim = "$";
       if (i + 1 < len && content[i + 1] === "$") {
         delim = "$$";
@@ -205,6 +199,7 @@ const ChatMessage = ({
 
       while (j < len) {
         if (content.startsWith(delim, j)) {
+          // String.startsWith() determines whether a string begins with the characters of a specified string.
           j += delim.length;
           foundClosing = true;
           break;
@@ -218,10 +213,9 @@ const ChatMessage = ({
         return;
       }
 
-      hasSeenMath = true;
       i = j;
       setDisplayedContent(content.slice(0, i));
-    }, 15);
+    }, 30); // 30ms provides a smooth frame rate for the dynamic chunks
 
     return () => clearInterval(intervalId);
   }, [
@@ -233,65 +227,18 @@ const ChatMessage = ({
     message.noAnimation,
   ]);
 
-  // Helper to render Metadata Badge
-  const renderMetadataBadge = () => {
-    if (isUser || !metadata) return null;
-
-    // Check mode from backend response
-    if (metadata.mode === "agent") {
-      return (
-        <div className="flex items-center gap-1.5 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-md mb-2 w-fit border border-purple-100">
-          <Brain size={12} />
-          <span>AI Reasoning Agent</span>
-        </div>
-      );
-    }
-    if (metadata.mode === "direct" || metadata.mode?.startsWith("targeted")) {
-      return (
-        <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-md mb-2 w-fit border border-blue-100">
-          <Search size={12} />
-          <span>Direct Textbook Search</span>
-        </div>
-      );
-    }
-    if (metadata.mode === "general_chat") {
-      return (
-        <div className="flex items-center gap-1.5 text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded-md mb-2 w-fit border border-orange-100">
-          <Sparkles size={12} />
-          <span>General Chat</span>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div
       className={`flex gap-4 p-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
-      {!isUser && (
-        <div className="hidden md:flex shrink-0 bg-green-100 p-2 rounded-full h-10 w-10 items-center justify-center">
-          <Bot className="w-6 h-6 text-green-600" />
-        </div>
-      )}
-
       <div
-        className={`max-w-xl p-4 rounded-lg text-left ${
+        className={`p-2 sm:p-4 rounded-md text-left ${
           isUser
-            ? "bg-teal-600 text-white rounded-br-none"
-            : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-none w-full"
+            ? "bg-teal-600 text-white rounded-br-none max-w-xl"
+            : "bg-white text-gray-800 border border-gray-50 rounded-bl-none w-full w-full"
         }`}
       >
-        {/* Render Badge Above Content */}
-        {renderMetadataBadge()}
-
         <div className="prose prose-sm max-w-none">
-          {!isUser && (
-            <div className="float-left mr-3 mb-1 md:hidden bg-green-100 p-1.5 rounded-full h-8 w-8 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-green-600" />
-            </div>
-          )}
-
           <ReactMarkdown
             remarkPlugins={[remarkMath]}
             rehypePlugins={[rehypeKatex]}
@@ -328,20 +275,9 @@ const ChatMessages = ({
 
 function normalizeMathMarkdown(text) {
   return text
-    .split("\n")
-    .map((line) => {
-      const trimmed = line.trim();
-      if (
-        trimmed.startsWith("$") &&
-        trimmed.endsWith("$") &&
-        !trimmed.startsWith("$$") &&
-        !trimmed.endsWith("$$")
-      ) {
-        return trimmed.replace(/^\$(.*)\$/, (_, inner) => `$$${inner}$$`);
-      }
-      return line;
-    })
-    .join("\n");
+    .replace(/\\\(|\\\)/g, "$") // Replaces matching LaTeX inline math brackets with standard Markdown $ symbols.
+    .replace(/\\\[|\\\]/g, "$$") // Replaces matching LaTeX block math brackets with standard Markdown $$ symbols.
+    .replace(/\s*\$\$\s*/g, "\n$$\n"); // Searches for $$ symbols with any surrounding whitespace and forces them onto independent lines separated by newlines.
 }
 
 // ============================================================================
@@ -488,6 +424,8 @@ export default function Home() {
       }
 
       const rawAnswer = response?.data?.answer || "Sorry, I didn't get that.";
+      console.log("RAW LLM OUTPUT:\n", rawAnswer);
+
       const normalizedAnswer = normalizeMathMarkdown(rawAnswer);
 
       // Capture metadata from backend for the badge
