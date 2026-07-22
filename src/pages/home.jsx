@@ -32,7 +32,7 @@ const Header = () => (
 const ExamplePrompts = ({ onPromptClick }) => {
   const prompts = [
     "What is conditional probability?",
-    "Exercise 3.5?",
+    "Exercise 4.13?",
     "Explain multinomial probability distribution",
     "Please tell the answer of exercise 3.5",
   ];
@@ -113,6 +113,12 @@ const ChatInput = ({ onSend, isSidebarOpen, disabled, onStop, isTyping }) => {
       </div>
     </footer>
   );
+};
+
+const katexOptions = {
+  throwOnError: false, // Prevents raw red error screens when encountering malformed LaTeX
+  errorColor: "#cc0000",
+  strict: false,
 };
 
 // ============================================================================
@@ -240,8 +246,8 @@ const ChatMessage = ({
       >
         <div className="prose prose-sm max-w-none">
           <ReactMarkdown
-            remarkPlugins={[remarkMath]}
-            rehypePlugins={[rehypeKatex]}
+            remarkPlugins={[[remarkMath, { singleDollar: true }]]}
+            rehypePlugins={[[rehypeKatex, katexOptions]]}
           >
             {displayedContent}
           </ReactMarkdown>
@@ -274,12 +280,14 @@ const ChatMessages = ({
 };
 
 function normalizeMathMarkdown(text) {
+  if (!text) return "";
   return text
-    .replace(/\\\(|\\\)/g, "$") // Replaces matching LaTeX inline math brackets with standard Markdown $ symbols.
-    .replace(/\\\[|\\\]/g, "$$") // Replaces matching LaTeX block math brackets with standard Markdown $$ symbols.
-    .replace(/\s*\$\$\s*/g, "\n$$\n"); // Searches for $$ symbols with any surrounding whitespace and forces them onto independent lines separated by newlines.
+    .replace(/\\\(|\\\)/g, "$") // replace(): Searches a string for a value or a regular expression and returns a new string with the replaced values.
+    .replace(/(^|[^\\])\\\[/g, "$1$$$$") // Matches \[ only if it is not preceded by a backslash, replacing it with $$.
+    .replace(/(^|[^\\])\\\]/g, "$1$$$$") // Matches \] only if it is not preceded by a backslash, replacing it with $$.
+    .replace(/(\\end\{[a-z]+\})\s*\$(?!\$)/gi, "$1 $$") // Fixes instances where the LLM forgets the second $ after closing an environment.
+    .replace(/\n{3,}/g, "\n\n"); // Collapses 3 or more consecutive newlines down to 2 to prevent wide gaps.
 }
-
 // ============================================================================
 // 4. Main Home Component
 // ============================================================================
@@ -365,10 +373,8 @@ export default function Home() {
       const history = data.map((msg) => ({
         id: msg.id,
         role: msg.role,
-        content: msg.content,
+        content: normalizeMathMarkdown(msg.content),
         noAnimation: true,
-        // Note: Unless you store metadata in DB, old messages won't have badges.
-        // That is expected behavior for now.
         metadata: msg.metadata || null,
       }));
       setMessages(history);
@@ -424,7 +430,7 @@ export default function Home() {
       }
 
       const rawAnswer = response?.data?.answer || "Sorry, I didn't get that.";
-      console.log("RAW LLM OUTPUT:\n", rawAnswer);
+      // console.log("RAW LLM OUTPUT:\n", rawAnswer);
 
       const normalizedAnswer = normalizeMathMarkdown(rawAnswer);
 
